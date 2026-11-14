@@ -187,6 +187,7 @@
     <module>org.openhab.binding.froniuswattpilot</module>
     <module>org.openhab.binding.fsinternetradio</module>
     <module>org.openhab.binding.ftpupload</module>
+    <module>org.openhab.binding.fullykiosk</module>
     <module>org.openhab.binding.gardena</module>
     <module>org.openhab.binding.gce</module>
     <module>org.openhab.binding.gemini</module>

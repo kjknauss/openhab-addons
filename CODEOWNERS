@@ -149,6 +149,7 @@
 /bundles/org.openhab.binding.froniuswattpilot/ @florian-h05
 /bundles/org.openhab.binding.fsinternetradio/ @paphko
 /bundles/org.openhab.binding.ftpupload/ @paulianttila
+/bundles/org.openhab.binding.fullykiosk/ @kjknauss
 /bundles/org.openhab.binding.gardena/ @gerrieg @andrewfg
 /bundles/org.openhab.binding.gce/ @clinique
 /bundles/org.openhab.binding.gemini/ @florian-h05
