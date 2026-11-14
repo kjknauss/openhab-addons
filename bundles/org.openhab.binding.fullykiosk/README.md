@@ -38,10 +38,12 @@ When the device is online, the Thing shows its vendor, model, MAC address, Fully
 |---------------------|--------------------|------------|----------|---------------------------------------------------------|
 | screen              | Switch             | RW         | no       | Turns the screen on or off                              |
 | screensaver         | Switch             | RW         | no       | Starts or stops the Fully Kiosk screensaver             |
+| screen-brightness   | Dimmer             | RW         | no       | Brightness of the screen                                |
+| url                 | String             | RW         | no       | Currently displayed page; send a URL to load it         |
+| action              | String             | W          | no       | Triggers a one-time action, see below                   |
 | battery-level       | Number             | R          | no       | Battery charge level (0-100 %)                          |
 | battery-temperature | Number:Temperature | R          | no       | Temperature of the device battery                       |
 | plugged             | Switch             | R          | no       | Whether the device is connected to a power source       |
-| current-page        | String             | R          | yes      | URL of the page currently displayed                     |
 | foreground-app      | String             | R          | yes      | Package name of the app currently in the foreground     |
 | screen-orientation  | Number             | R          | yes      | Current screen orientation as reported by the device    |
 | kiosk-mode          | Switch             | R          | yes      | Whether kiosk mode is active                            |
@@ -50,6 +52,19 @@ When the device is online, the Thing shows its vendor, model, MAC address, Fully
 | storage-total       | Number:DataAmount  | R          | yes      | Total internal storage                                  |
 | memory-free         | Number:DataAmount  | R          | yes      | Free RAM                                                |
 | memory-total        | Number:DataAmount  | R          | yes      | Total RAM                                               |
+
+The `screen-brightness` channel reads the Fully Kiosk settings, which are only requested while the channel is linked.
+
+The `action` channel accepts these commands:
+
+| Command       | Description                               |
+|---------------|-------------------------------------------|
+| loadStartUrl  | Loads the start URL                       |
+| toForeground  | Brings Fully Kiosk to the foreground      |
+| toBackground  | Sends Fully Kiosk to the background       |
+| restartApp    | Restarts Fully Kiosk                      |
+| clearCache    | Clears the browser cache                  |
+| triggerMotion | Simulates motion, e.g. to wake the screen |
 
 ## Full Example
 
@@ -63,5 +78,7 @@ Thing fullykiosk:device:hallway "Hallway Tablet" [ hostname="192.168.1.50", pass
 
 ```java
 Switch HallwayTablet_Screen "Hallway Tablet Screen" { channel="fullykiosk:device:hallway:screen" }
+Dimmer HallwayTablet_Brightness "Hallway Tablet Brightness [%d %%]" { channel="fullykiosk:device:hallway:screen-brightness" }
+String HallwayTablet_Url "Hallway Tablet Page [%s]" { channel="fullykiosk:device:hallway:url" }
 Number HallwayTablet_Battery "Hallway Tablet Battery [%d %%]" { channel="fullykiosk:device:hallway:battery-level" }
 ```

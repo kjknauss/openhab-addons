@@ -16,6 +16,7 @@ import static org.openhab.binding.fullykiosk.internal.FullyKioskBindingConstants
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +35,7 @@ import org.openhab.binding.fullykiosk.internal.dto.DeviceInfo;
 import org.openhab.binding.fullykiosk.internal.dto.Response;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.library.types.PercentType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.library.unit.SIUnits;
@@ -51,6 +53,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSyntaxException;
 
 /**
@@ -68,6 +74,13 @@ public class FullyKioskHandler extends BaseThingHandler {
     /** Android reports this MAC address when the app is not allowed to read the real one. */
     private static final String PLACEHOLDER_MAC = "02:00:00:00:00:00";
 
+    private static final String SETTING_SCREEN_BRIGHTNESS = "screenBrightness";
+    private static final int MAX_BRIGHTNESS = 255;
+
+    /** Commands without parameters that may be sent through the action channel. */
+    private static final Set<String> ACTIONS = Set.of("loadStartUrl", "toForeground", "toBackground", "restartApp",
+            "clearCache", "triggerMotion");
+
     private final Logger logger = LoggerFactory.getLogger(FullyKioskHandler.class);
     private final HttpClient httpClient;
 
@@ -75,6 +88,7 @@ public class FullyKioskHandler extends BaseThingHandler {
     private volatile @Nullable DeviceInfo lastDeviceInfo;
     private @Nullable ScheduledFuture<?> pollingJob;
     private volatile Map<String, String> lastProperties = Map.of();
+    private volatile State lastBrightness = UnDefType.UNDEF;
     /** Cleared on dispose so that polls and commands still in flight do not publish stale state. */
     private volatile boolean active;
 
@@ -111,11 +125,16 @@ public class FullyKioskHandler extends BaseThingHandler {
             pollingJob = null;
         }
         lastDeviceInfo = null;
+        lastBrightness = UnDefType.UNDEF;
     }
 
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
         if (command instanceof RefreshType) {
+            if (CHANNEL_SCREEN_BRIGHTNESS.equals(channelUID.getId())) {
+                updateState(CHANNEL_SCREEN_BRIGHTNESS, lastBrightness);
+                return;
+            }
             DeviceInfo deviceInfo = lastDeviceInfo;
             if (deviceInfo != null) {
                 updateChannels(deviceInfo);
@@ -123,31 +142,84 @@ public class FullyKioskHandler extends BaseThingHandler {
             return;
         }
 
-        if (!(command instanceof OnOffType onOff)) {
+        FullyCommand fullyCommand = toFullyCommand(channelUID.getId(), command);
+        if (fullyCommand == null) {
             logger.debug("Unsupported command {} for channel {}", command, channelUID.getId());
             return;
         }
-        boolean on = onOff == OnOffType.ON;
-        String fullyCommand;
-        switch (channelUID.getId()) {
-            case CHANNEL_SCREEN -> fullyCommand = on ? "screenOn" : "screenOff";
-            case CHANNEL_SCREENSAVER -> fullyCommand = on ? "startScreensaver" : "stopScreensaver";
-            default -> {
-                logger.debug("Channel {} does not accept commands", channelUID.getId());
-                return;
-            }
-        }
-        scheduler.execute(() -> executeCommand(fullyCommand));
+        FullyCommand commandToSend = fullyCommand;
+        scheduler.execute(() -> executeCommand(commandToSend));
     }
 
-    private void executeCommand(String fullyCommand) {
+    /**
+     * Translates an openHAB command into a Fully Kiosk REST command.
+     *
+     * @return the command to send, or {@code null} if the channel does not support the command
+     */
+    static @Nullable FullyCommand toFullyCommand(String channelId, Command command) {
+        switch (channelId) {
+            case CHANNEL_SCREEN -> {
+                if (command instanceof OnOffType onOff) {
+                    return new FullyCommand(onOff == OnOffType.ON ? "screenOn" : "screenOff");
+                }
+            }
+            case CHANNEL_SCREENSAVER -> {
+                if (command instanceof OnOffType onOff) {
+                    return new FullyCommand(onOff == OnOffType.ON ? "startScreensaver" : "stopScreensaver");
+                }
+            }
+            case CHANNEL_SCREEN_BRIGHTNESS -> {
+                Integer brightness = null;
+                if (command instanceof PercentType percent) {
+                    brightness = toFullyBrightness(percent);
+                } else if (command instanceof OnOffType onOff) {
+                    brightness = onOff == OnOffType.ON ? MAX_BRIGHTNESS : 0;
+                }
+                if (brightness != null) {
+                    return new FullyCommand("setStringSetting",
+                            Map.of("key", SETTING_SCREEN_BRIGHTNESS, "value", String.valueOf(brightness)));
+                }
+            }
+            case CHANNEL_URL -> {
+                if (command instanceof StringType url && !url.toString().isBlank()) {
+                    return new FullyCommand("loadUrl", Map.of("url", url.toString()));
+                }
+            }
+            case CHANNEL_ACTION -> {
+                // Only a fixed set of commands is allowed, so arbitrary REST commands cannot be sent via this channel.
+                if (command instanceof StringType action && ACTIONS.contains(action.toString())) {
+                    return new FullyCommand(action.toString());
+                }
+            }
+            default -> {
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Converts a percentage into the Fully Kiosk brightness range 0-255.
+     */
+    static int toFullyBrightness(PercentType percent) {
+        return (int) Math.round(percent.doubleValue() * MAX_BRIGHTNESS / 100);
+    }
+
+    /**
+     * Converts a Fully Kiosk brightness (0-255) into a percentage.
+     */
+    static PercentType toBrightnessPercent(double brightness) {
+        double clamped = Math.max(0, Math.min(MAX_BRIGHTNESS, brightness));
+        return new PercentType((int) Math.round(clamped * 100 / MAX_BRIGHTNESS));
+    }
+
+    private void executeCommand(FullyCommand fullyCommand) {
         if (!active) {
             return;
         }
         try {
-            sendCommand(config, fullyCommand, Map.of(), Response.class);
+            sendCommand(config, fullyCommand.name(), fullyCommand.parameters(), Response.class);
         } catch (FullyKioskDeviceErrorException e) {
-            logger.warn("Fully Kiosk rejected command '{}': {}", fullyCommand, e.getDeviceMessage());
+            logger.warn("Fully Kiosk rejected command '{}': {}", fullyCommand.name(), e.getDeviceMessage());
             return;
         } catch (FullyKioskCommunicationException e) {
             updateStatus(ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
@@ -164,6 +236,7 @@ public class FullyKioskHandler extends BaseThingHandler {
         if (!active) {
             return;
         }
+        FullyKioskConfiguration config = this.config;
         try {
             DeviceInfo deviceInfo = sendCommand(config, "deviceInfo", Map.of(), DeviceInfo.class);
             lastDeviceInfo = deviceInfo;
@@ -175,11 +248,32 @@ public class FullyKioskHandler extends BaseThingHandler {
                 updateProperties(properties);
                 lastProperties = properties;
             }
+
+            // Brightness is only available from the much larger settings list, so fetch it only when needed.
+            if (isLinked(CHANNEL_SCREEN_BRIGHTNESS)) {
+                updateBrightness(config);
+            }
         } catch (FullyKioskCommunicationException e) {
             updateStatus(ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private void updateBrightness(FullyKioskConfiguration config)
+            throws FullyKioskCommunicationException, InterruptedException {
+        State brightness = UnDefType.UNDEF;
+        try {
+            JsonObject settings = parseSettings(sendRequest(config, "listSettings", Map.of()));
+            Double value = getNumberSetting(settings, SETTING_SCREEN_BRIGHTNESS);
+            if (value != null) {
+                brightness = toBrightnessPercent(value);
+            }
+        } catch (FullyKioskDeviceErrorException e) {
+            logger.debug("Fully Kiosk rejected reading settings: {}", e.getDeviceMessage());
+        }
+        lastBrightness = brightness;
+        updateState(CHANNEL_SCREEN_BRIGHTNESS, brightness);
     }
 
     private void updateChannels(DeviceInfo deviceInfo) {
@@ -188,7 +282,7 @@ public class FullyKioskHandler extends BaseThingHandler {
         updateState(CHANNEL_BATTERY_LEVEL, toDecimal(deviceInfo.batteryLevel));
         updateState(CHANNEL_BATTERY_TEMPERATURE, toQuantity(deviceInfo.batteryTemperature, SIUnits.CELSIUS));
         updateState(CHANNEL_PLUGGED, toOnOff(deviceInfo.plugged));
-        updateState(CHANNEL_CURRENT_PAGE, toString(deviceInfo.currentPage));
+        updateState(CHANNEL_URL, toString(deviceInfo.currentPage));
         updateState(CHANNEL_FOREGROUND_APP, toString(deviceInfo.foregroundApp));
         updateState(CHANNEL_SCREEN_ORIENTATION, toDecimal(deviceInfo.screenOrientation));
         updateState(CHANNEL_KIOSK_MODE, toOnOff(deviceInfo.kioskMode));
@@ -249,6 +343,16 @@ public class FullyKioskHandler extends BaseThingHandler {
     private <T extends Response> T sendCommand(FullyKioskConfiguration config, String fullyCommand,
             Map<String, String> parameters, Class<T> responseType)
             throws FullyKioskCommunicationException, InterruptedException {
+        return parseResponse(sendRequest(config, fullyCommand, parameters), responseType);
+    }
+
+    /**
+     * Sends a command to the Fully Kiosk REST interface.
+     *
+     * @return the response body
+     */
+    private String sendRequest(FullyKioskConfiguration config, String fullyCommand, Map<String, String> parameters)
+            throws FullyKioskCommunicationException, InterruptedException {
         // Jetty URL-encodes query parameters, so values such as the password may contain any characters.
         Request request = httpClient.newRequest(config.hostname, config.port).path("/").param("cmd", fullyCommand)
                 .param("type", "json").param("password", config.password)
@@ -268,7 +372,40 @@ public class FullyKioskHandler extends BaseThingHandler {
             throw new FullyKioskCommunicationException(
                     "@text/offline.communication-error.http-status [\"" + response.getStatus() + "\"]");
         }
-        return parseResponse(response.getContentAsString(), responseType);
+        return response.getContentAsString();
+    }
+
+    /**
+     * Parses a {@code listSettings} response, a flat JSON object of setting keys and values.
+     */
+    static JsonObject parseSettings(String json) throws FullyKioskCommunicationException {
+        // Validates the JSON object and rejects error responses.
+        parseResponse(json, Response.class);
+        return JsonParser.parseString(json).getAsJsonObject();
+    }
+
+    /**
+     * Reads a numeric setting. Fully Kiosk stores most settings as strings, so numeric strings are accepted.
+     *
+     * @return the value, or {@code null} if the setting is missing, empty or not numeric
+     */
+    static @Nullable Double getNumberSetting(JsonObject settings, String key) {
+        JsonElement element = settings.get(key);
+        if (element == null || !element.isJsonPrimitive()) {
+            return null;
+        }
+        JsonPrimitive primitive = element.getAsJsonPrimitive();
+        if (primitive.isNumber()) {
+            return primitive.getAsDouble();
+        }
+        if (primitive.isString()) {
+            try {
+                return Double.valueOf(primitive.getAsString().trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**

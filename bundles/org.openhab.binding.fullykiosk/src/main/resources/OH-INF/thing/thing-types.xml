@@ -12,10 +12,12 @@
 		<channels>
 			<channel id="screen" typeId="screen"/>
 			<channel id="screensaver" typeId="screensaver"/>
+			<channel id="screen-brightness" typeId="screen-brightness"/>
+			<channel id="url" typeId="url"/>
+			<channel id="action" typeId="action"/>
 			<channel id="battery-level" typeId="system.battery-level"/>
 			<channel id="battery-temperature" typeId="battery-temperature"/>
 			<channel id="plugged" typeId="plugged"/>
-			<channel id="current-page" typeId="current-page"/>
 			<channel id="foreground-app" typeId="foreground-app"/>
 			<channel id="screen-orientation" typeId="screen-orientation"/>
 			<channel id="kiosk-mode" typeId="kiosk-mode"/>
@@ -71,6 +73,39 @@
 		</tags>
 	</channel-type>
 
+	<channel-type id="screen-brightness">
+		<item-type>Dimmer</item-type>
+		<label>Screen Brightness</label>
+		<description>Brightness of the screen</description>
+		<tags>
+			<tag>Control</tag>
+			<tag>Brightness</tag>
+		</tags>
+	</channel-type>
+
+	<channel-type id="url">
+		<item-type>String</item-type>
+		<label>URL</label>
+		<description>URL of the page currently displayed. Send a URL to load it.</description>
+	</channel-type>
+
+	<channel-type id="action">
+		<item-type>String</item-type>
+		<label>Action</label>
+		<description>Triggers a one-time action on the device</description>
+		<command>
+			<options>
+				<option value="loadStartUrl">Load Start URL</option>
+				<option value="toForeground">Bring to Foreground</option>
+				<option value="toBackground">Send to Background</option>
+				<option value="restartApp">Restart App</option>
+				<option value="clearCache">Clear Cache</option>
+				<option value="triggerMotion">Trigger Motion</option>
+			</options>
+		</command>
+		<autoUpdatePolicy>veto</autoUpdatePolicy>
+	</channel-type>
+
 	<channel-type id="battery-temperature">
 		<item-type>Number:Temperature</item-type>
 		<label>Battery Temperature</label>
@@ -94,12 +129,6 @@
 		<state readOnly="true"/>
 	</channel-type>
 
-	<channel-type id="current-page" advanced="true">
-		<item-type>String</item-type>
-		<label>Current Page</label>
-		<description>URL of the page currently displayed</description>
-		<state readOnly="true"/>
-	</channel-type>
 
 	<channel-type id="foreground-app" advanced="true">
 		<item-type>String</item-type>

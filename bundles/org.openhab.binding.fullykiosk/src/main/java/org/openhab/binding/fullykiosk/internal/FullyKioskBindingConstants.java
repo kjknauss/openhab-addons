@@ -32,10 +32,12 @@ public class FullyKioskBindingConstants {
     // List of all Channel ids
     public static final String CHANNEL_SCREEN = "screen";
     public static final String CHANNEL_SCREENSAVER = "screensaver";
+    public static final String CHANNEL_SCREEN_BRIGHTNESS = "screen-brightness";
+    public static final String CHANNEL_URL = "url";
+    public static final String CHANNEL_ACTION = "action";
     public static final String CHANNEL_BATTERY_LEVEL = "battery-level";
     public static final String CHANNEL_BATTERY_TEMPERATURE = "battery-temperature";
     public static final String CHANNEL_PLUGGED = "plugged";
-    public static final String CHANNEL_CURRENT_PAGE = "current-page";
     public static final String CHANNEL_FOREGROUND_APP = "foreground-app";
     public static final String CHANNEL_SCREEN_ORIENTATION = "screen-orientation";
     public static final String CHANNEL_KIOSK_MODE = "kiosk-mode";
