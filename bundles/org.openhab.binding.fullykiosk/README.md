@@ -30,9 +30,20 @@ Things must be added manually.
 
 ## Channels
 
-| Channel       | Type   | Read/Write | Description                    |
-|---------------|--------|------------|--------------------------------|
-| battery-level | Number | R          | Battery charge level (0-100 %) |
+| Channel             | Type               | Read/Write | Advanced | Description                                             |
+|---------------------|--------------------|------------|----------|---------------------------------------------------------|
+| battery-level       | Number             | R          | no       | Battery charge level (0-100 %)                          |
+| battery-temperature | Number:Temperature | R          | no       | Temperature of the device battery                       |
+| plugged             | Switch             | R          | no       | Whether the device is connected to a power source       |
+| current-page        | String             | R          | yes      | URL of the page currently displayed                     |
+| foreground-app      | String             | R          | yes      | Package name of the app currently in the foreground     |
+| screen-orientation  | Number             | R          | yes      | Current screen orientation as reported by the device    |
+| kiosk-mode          | Switch             | R          | yes      | Whether kiosk mode is active                            |
+| device-admin        | Switch             | R          | yes      | Whether Fully Kiosk has device administrator permission |
+| storage-free        | Number:DataAmount  | R          | yes      | Free internal storage                                   |
+| storage-total       | Number:DataAmount  | R          | yes      | Total internal storage                                  |
+| memory-free         | Number:DataAmount  | R          | yes      | Free RAM                                                |
+| memory-total        | Number:DataAmount  | R          | yes      | Total RAM                                               |
 
 ## Full Example
 

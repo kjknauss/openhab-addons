@@ -35,10 +35,44 @@ public class FullyKioskHandlerTest {
     }
 
     @Test
-    public void missingBatteryLevelIsNull() throws FullyKioskCommunicationException {
+    public void parsesDiagnosticFields() throws FullyKioskCommunicationException {
+        DeviceInfo deviceInfo = FullyKioskHandler.parseDeviceInfo("""
+                {
+                  "batteryTemperature": 23.5,
+                  "plugged": false,
+                  "currentPage": "http://openhab:8080/page/tablet",
+                  "foregroundApp": "de.ozerov.fully",
+                  "screenOrientation": 90,
+                  "kioskMode": true,
+                  "isDeviceAdmin": true,
+                  "internalStorageFreeSpace": 12345678901,
+                  "internalStorageTotalSpace": 32000000000,
+                  "ramFreeMemory": 1500000000.5,
+                  "ramTotalMemory": 3000000000
+                }
+                """);
+
+        assertEquals(23.5, deviceInfo.batteryTemperature);
+        assertEquals(Boolean.FALSE, deviceInfo.plugged);
+        assertEquals("http://openhab:8080/page/tablet", deviceInfo.currentPage);
+        assertEquals("de.ozerov.fully", deviceInfo.foregroundApp);
+        assertEquals(90.0, deviceInfo.screenOrientation);
+        assertEquals(Boolean.TRUE, deviceInfo.kioskMode);
+        assertEquals(Boolean.TRUE, deviceInfo.isDeviceAdmin);
+        assertEquals(12345678901.0, deviceInfo.internalStorageFreeSpace);
+        assertEquals(32000000000.0, deviceInfo.internalStorageTotalSpace);
+        assertEquals(1500000000.5, deviceInfo.ramFreeMemory);
+        assertEquals(3000000000.0, deviceInfo.ramTotalMemory);
+    }
+
+    @Test
+    public void missingFieldsAreNull() throws FullyKioskCommunicationException {
         DeviceInfo deviceInfo = FullyKioskHandler.parseDeviceInfo("{\"deviceName\":\"Garage\"}");
 
         assertNull(deviceInfo.batteryLevel);
+        assertNull(deviceInfo.plugged);
+        assertNull(deviceInfo.currentPage);
+        assertNull(deviceInfo.internalStorageFreeSpace);
     }
 
     @Test

@@ -31,4 +31,15 @@ public class FullyKioskBindingConstants {
 
     // List of all Channel ids
     public static final String CHANNEL_BATTERY_LEVEL = "battery-level";
+    public static final String CHANNEL_BATTERY_TEMPERATURE = "battery-temperature";
+    public static final String CHANNEL_PLUGGED = "plugged";
+    public static final String CHANNEL_CURRENT_PAGE = "current-page";
+    public static final String CHANNEL_FOREGROUND_APP = "foreground-app";
+    public static final String CHANNEL_SCREEN_ORIENTATION = "screen-orientation";
+    public static final String CHANNEL_KIOSK_MODE = "kiosk-mode";
+    public static final String CHANNEL_DEVICE_ADMIN = "device-admin";
+    public static final String CHANNEL_STORAGE_FREE = "storage-free";
+    public static final String CHANNEL_STORAGE_TOTAL = "storage-total";
+    public static final String CHANNEL_MEMORY_FREE = "memory-free";
+    public static final String CHANNEL_MEMORY_TOTAL = "memory-total";
 }

@@ -11,6 +11,17 @@
 
 		<channels>
 			<channel id="battery-level" typeId="system.battery-level"/>
+			<channel id="battery-temperature" typeId="battery-temperature"/>
+			<channel id="plugged" typeId="plugged"/>
+			<channel id="current-page" typeId="current-page"/>
+			<channel id="foreground-app" typeId="foreground-app"/>
+			<channel id="screen-orientation" typeId="screen-orientation"/>
+			<channel id="kiosk-mode" typeId="kiosk-mode"/>
+			<channel id="device-admin" typeId="device-admin"/>
+			<channel id="storage-free" typeId="storage-free"/>
+			<channel id="storage-total" typeId="storage-total"/>
+			<channel id="memory-free" typeId="memory-free"/>
+			<channel id="memory-total" typeId="memory-total"/>
 		</channels>
 
 		<config-description>
@@ -38,4 +49,96 @@
 			</parameter>
 		</config-description>
 	</thing-type>
+
+	<channel-type id="battery-temperature">
+		<item-type>Number:Temperature</item-type>
+		<label>Battery Temperature</label>
+		<description>Temperature of the device battery</description>
+		<category>Temperature</category>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Temperature</tag>
+		</tags>
+		<state readOnly="true" pattern="%.1f %unit%"/>
+	</channel-type>
+
+	<channel-type id="plugged">
+		<item-type>Switch</item-type>
+		<label>Plugged In</label>
+		<description>Whether the device is connected to a power source</description>
+		<tags>
+			<tag>Status</tag>
+			<tag>Power</tag>
+		</tags>
+		<state readOnly="true"/>
+	</channel-type>
+
+	<channel-type id="current-page" advanced="true">
+		<item-type>String</item-type>
+		<label>Current Page</label>
+		<description>URL of the page currently displayed</description>
+		<state readOnly="true"/>
+	</channel-type>
+
+	<channel-type id="foreground-app" advanced="true">
+		<item-type>String</item-type>
+		<label>Foreground App</label>
+		<description>Package name of the app currently in the foreground</description>
+		<state readOnly="true"/>
+	</channel-type>
+
+	<channel-type id="screen-orientation" advanced="true">
+		<item-type>Number</item-type>
+		<label>Screen Orientation</label>
+		<description>Current screen orientation as reported by the device</description>
+		<state readOnly="true" pattern="%d"/>
+	</channel-type>
+
+	<channel-type id="kiosk-mode" advanced="true">
+		<item-type>Switch</item-type>
+		<label>Kiosk Mode</label>
+		<description>Whether kiosk mode is active</description>
+		<tags>
+			<tag>Status</tag>
+		</tags>
+		<state readOnly="true"/>
+	</channel-type>
+
+	<channel-type id="device-admin" advanced="true">
+		<item-type>Switch</item-type>
+		<label>Device Admin</label>
+		<description>Whether Fully Kiosk has device administrator permission</description>
+		<tags>
+			<tag>Status</tag>
+		</tags>
+		<state readOnly="true"/>
+	</channel-type>
+
+	<channel-type id="storage-free" advanced="true">
+		<item-type>Number:DataAmount</item-type>
+		<label>Free Storage</label>
+		<description>Free internal storage</description>
+		<state readOnly="true" pattern="%.0f MB"/>
+	</channel-type>
+
+	<channel-type id="storage-total" advanced="true">
+		<item-type>Number:DataAmount</item-type>
+		<label>Total Storage</label>
+		<description>Total internal storage</description>
+		<state readOnly="true" pattern="%.0f MB"/>
+	</channel-type>
+
+	<channel-type id="memory-free" advanced="true">
+		<item-type>Number:DataAmount</item-type>
+		<label>Free Memory</label>
+		<description>Free RAM</description>
+		<state readOnly="true" pattern="%.0f MB"/>
+	</channel-type>
+
+	<channel-type id="memory-total" advanced="true">
+		<item-type>Number:DataAmount</item-type>
+		<label>Total Memory</label>
+		<description>Total RAM</description>
+		<state readOnly="true" pattern="%.0f MB"/>
+	</channel-type>
 </thing:thing-descriptions>

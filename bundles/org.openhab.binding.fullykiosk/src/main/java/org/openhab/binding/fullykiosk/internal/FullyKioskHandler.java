@@ -19,6 +19,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.measure.Quantity;
+import javax.measure.Unit;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
@@ -26,6 +29,11 @@ import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.http.HttpStatus;
 import org.openhab.binding.fullykiosk.internal.dto.DeviceInfo;
 import org.openhab.core.library.types.DecimalType;
+import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.library.types.QuantityType;
+import org.openhab.core.library.types.StringType;
+import org.openhab.core.library.unit.SIUnits;
+import org.openhab.core.library.unit.Units;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingStatus;
@@ -33,6 +41,7 @@ import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
+import org.openhab.core.types.State;
 import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,8 +123,34 @@ public class FullyKioskHandler extends BaseThingHandler {
     }
 
     private void updateChannels(DeviceInfo deviceInfo) {
-        Double batteryLevel = deviceInfo.batteryLevel;
-        updateState(CHANNEL_BATTERY_LEVEL, batteryLevel == null ? UnDefType.UNDEF : new DecimalType(batteryLevel));
+        updateState(CHANNEL_BATTERY_LEVEL, toDecimal(deviceInfo.batteryLevel));
+        updateState(CHANNEL_BATTERY_TEMPERATURE, toQuantity(deviceInfo.batteryTemperature, SIUnits.CELSIUS));
+        updateState(CHANNEL_PLUGGED, toOnOff(deviceInfo.plugged));
+        updateState(CHANNEL_CURRENT_PAGE, toString(deviceInfo.currentPage));
+        updateState(CHANNEL_FOREGROUND_APP, toString(deviceInfo.foregroundApp));
+        updateState(CHANNEL_SCREEN_ORIENTATION, toDecimal(deviceInfo.screenOrientation));
+        updateState(CHANNEL_KIOSK_MODE, toOnOff(deviceInfo.kioskMode));
+        updateState(CHANNEL_DEVICE_ADMIN, toOnOff(deviceInfo.isDeviceAdmin));
+        updateState(CHANNEL_STORAGE_FREE, toQuantity(deviceInfo.internalStorageFreeSpace, Units.BYTE));
+        updateState(CHANNEL_STORAGE_TOTAL, toQuantity(deviceInfo.internalStorageTotalSpace, Units.BYTE));
+        updateState(CHANNEL_MEMORY_FREE, toQuantity(deviceInfo.ramFreeMemory, Units.BYTE));
+        updateState(CHANNEL_MEMORY_TOTAL, toQuantity(deviceInfo.ramTotalMemory, Units.BYTE));
+    }
+
+    private static State toDecimal(@Nullable Double value) {
+        return value == null ? UnDefType.UNDEF : new DecimalType(value);
+    }
+
+    private static State toOnOff(@Nullable Boolean value) {
+        return value == null ? UnDefType.UNDEF : OnOffType.from(value);
+    }
+
+    private static State toString(@Nullable String value) {
+        return value == null ? UnDefType.UNDEF : new StringType(value);
+    }
+
+    private static <Q extends Quantity<Q>> State toQuantity(@Nullable Double value, Unit<Q> unit) {
+        return value == null ? UnDefType.UNDEF : new QuantityType<>(value, unit);
     }
 
     private DeviceInfo fetchDeviceInfo(FullyKioskConfiguration config)

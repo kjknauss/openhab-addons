@@ -30,4 +30,23 @@ public class DeviceInfo {
 
     /** Battery charge in percent (0-100). */
     public @Nullable Double batteryLevel;
+    /** Battery temperature in degrees Celsius. */
+    public @Nullable Double batteryTemperature;
+    public @Nullable Boolean plugged;
+
+    public @Nullable String currentPage;
+    public @Nullable String foregroundApp;
+    public @Nullable Double screenOrientation;
+    public @Nullable Boolean kioskMode;
+    public @Nullable Boolean isDeviceAdmin;
+
+    // Numeric fields use Double so that an unexpected decimal value cannot fail parsing of the whole response.
+    /** Free internal storage in bytes. */
+    public @Nullable Double internalStorageFreeSpace;
+    /** Total internal storage in bytes. */
+    public @Nullable Double internalStorageTotalSpace;
+    /** Free RAM in bytes. */
+    public @Nullable Double ramFreeMemory;
+    /** Total RAM in bytes. */
+    public @Nullable Double ramTotalMemory;
 }
