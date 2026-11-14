@@ -14,19 +14,24 @@ package org.openhab.binding.fullykiosk.internal.dto;
 
 import org.eclipse.jdt.annotation.Nullable;
 
+import com.google.gson.annotations.SerializedName;
+
 /**
  * The {@link DeviceInfo} is the JSON response of the Fully Kiosk Browser REST command {@code cmd=deviceInfo}.
- * <p>
- * On failure, Fully Kiosk answers with only {@code status} set to {@code "Error"} and an explanation in
- * {@code statustext}.
  *
  * @author Keith Knauss - Initial contribution
  */
-public class DeviceInfo {
-    public static final String STATUS_ERROR = "Error";
+public class DeviceInfo extends Response {
+    public @Nullable String deviceID;
+    public @Nullable String deviceName;
+    public @Nullable String deviceManufacturer;
+    public @Nullable String deviceModel;
+    public @Nullable String appVersionName;
+    @SerializedName("Mac")
+    public @Nullable String mac;
 
-    public @Nullable String status;
-    public @Nullable String statustext;
+    public @Nullable Boolean screenOn;
+    public @Nullable Boolean isInScreensaver;
 
     /** Battery charge in percent (0-100). */
     public @Nullable Double batteryLevel;

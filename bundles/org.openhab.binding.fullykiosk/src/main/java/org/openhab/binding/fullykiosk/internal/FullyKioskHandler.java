@@ -14,6 +14,8 @@ package org.openhab.binding.fullykiosk.internal;
 
 import static org.openhab.binding.fullykiosk.internal.FullyKioskBindingConstants.*;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -26,8 +28,10 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.http.HttpStatus;
 import org.openhab.binding.fullykiosk.internal.dto.DeviceInfo;
+import org.openhab.binding.fullykiosk.internal.dto.Response;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.QuantityType;
@@ -50,7 +54,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 
 /**
- * The {@link FullyKioskHandler} polls a Fully Kiosk Browser device through its Remote Admin REST interface.
+ * The {@link FullyKioskHandler} polls and controls a Fully Kiosk Browser device through its Remote Admin REST
+ * interface.
  *
  * @author Keith Knauss - Initial contribution
  */
@@ -60,12 +65,18 @@ public class FullyKioskHandler extends BaseThingHandler {
     private static final long REQUEST_TIMEOUT_SECONDS = 10;
     private static final Gson GSON = new Gson();
 
+    /** Android reports this MAC address when the app is not allowed to read the real one. */
+    private static final String PLACEHOLDER_MAC = "02:00:00:00:00:00";
+
     private final Logger logger = LoggerFactory.getLogger(FullyKioskHandler.class);
     private final HttpClient httpClient;
 
     private volatile FullyKioskConfiguration config = new FullyKioskConfiguration();
     private volatile @Nullable DeviceInfo lastDeviceInfo;
     private @Nullable ScheduledFuture<?> pollingJob;
+    private volatile Map<String, String> lastProperties = Map.of();
+    /** Cleared on dispose so that polls and commands still in flight do not publish stale state. */
+    private volatile boolean active;
 
     public FullyKioskHandler(Thing thing, HttpClient httpClient) {
         super(thing);
@@ -84,13 +95,16 @@ public class FullyKioskHandler extends BaseThingHandler {
             return;
         }
         this.config = config;
+        lastProperties = Map.of();
 
         updateStatus(ThingStatus.UNKNOWN);
+        active = true;
         pollingJob = scheduler.scheduleWithFixedDelay(this::poll, 0, config.refreshInterval, TimeUnit.SECONDS);
     }
 
     @Override
     public void dispose() {
+        active = false;
         ScheduledFuture<?> job = pollingJob;
         if (job != null) {
             job.cancel(true);
@@ -106,15 +120,61 @@ public class FullyKioskHandler extends BaseThingHandler {
             if (deviceInfo != null) {
                 updateChannels(deviceInfo);
             }
+            return;
         }
+
+        if (!(command instanceof OnOffType onOff)) {
+            logger.debug("Unsupported command {} for channel {}", command, channelUID.getId());
+            return;
+        }
+        boolean on = onOff == OnOffType.ON;
+        String fullyCommand;
+        switch (channelUID.getId()) {
+            case CHANNEL_SCREEN -> fullyCommand = on ? "screenOn" : "screenOff";
+            case CHANNEL_SCREENSAVER -> fullyCommand = on ? "startScreensaver" : "stopScreensaver";
+            default -> {
+                logger.debug("Channel {} does not accept commands", channelUID.getId());
+                return;
+            }
+        }
+        scheduler.execute(() -> executeCommand(fullyCommand));
+    }
+
+    private void executeCommand(String fullyCommand) {
+        if (!active) {
+            return;
+        }
+        try {
+            sendCommand(config, fullyCommand, Map.of(), Response.class);
+        } catch (FullyKioskDeviceErrorException e) {
+            logger.warn("Fully Kiosk rejected command '{}': {}", fullyCommand, e.getDeviceMessage());
+            return;
+        } catch (FullyKioskCommunicationException e) {
+            updateStatus(ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+            return;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        // Refresh right away so channels reflect the command instead of waiting for the next poll.
+        poll();
     }
 
     private void poll() {
+        if (!active) {
+            return;
+        }
         try {
-            DeviceInfo deviceInfo = fetchDeviceInfo(config);
+            DeviceInfo deviceInfo = sendCommand(config, "deviceInfo", Map.of(), DeviceInfo.class);
             lastDeviceInfo = deviceInfo;
             updateStatus(ThingStatus.ONLINE);
             updateChannels(deviceInfo);
+
+            Map<String, String> properties = buildProperties(deviceInfo);
+            if (!properties.equals(lastProperties)) {
+                updateProperties(properties);
+                lastProperties = properties;
+            }
         } catch (FullyKioskCommunicationException e) {
             updateStatus(ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
         } catch (InterruptedException e) {
@@ -123,6 +183,8 @@ public class FullyKioskHandler extends BaseThingHandler {
     }
 
     private void updateChannels(DeviceInfo deviceInfo) {
+        updateState(CHANNEL_SCREEN, toOnOff(deviceInfo.screenOn));
+        updateState(CHANNEL_SCREENSAVER, toOnOff(deviceInfo.isInScreensaver));
         updateState(CHANNEL_BATTERY_LEVEL, toDecimal(deviceInfo.batteryLevel));
         updateState(CHANNEL_BATTERY_TEMPERATURE, toQuantity(deviceInfo.batteryTemperature, SIUnits.CELSIUS));
         updateState(CHANNEL_PLUGGED, toOnOff(deviceInfo.plugged));
@@ -153,16 +215,52 @@ public class FullyKioskHandler extends BaseThingHandler {
         return value == null ? UnDefType.UNDEF : new QuantityType<>(value, unit);
     }
 
-    private DeviceInfo fetchDeviceInfo(FullyKioskConfiguration config)
+    /**
+     * Builds the Thing properties describing the device from a {@code deviceInfo} response.
+     */
+    static Map<String, String> buildProperties(DeviceInfo deviceInfo) {
+        Map<String, String> properties = new HashMap<>();
+        putIfPresent(properties, Thing.PROPERTY_VENDOR, deviceInfo.deviceManufacturer);
+        putIfPresent(properties, Thing.PROPERTY_MODEL_ID, deviceInfo.deviceModel);
+        putIfPresent(properties, PROPERTY_DEVICE_ID, deviceInfo.deviceID);
+        putIfPresent(properties, PROPERTY_DEVICE_NAME, deviceInfo.deviceName);
+        putIfPresent(properties, PROPERTY_APP_VERSION, deviceInfo.appVersionName);
+        String mac = deviceInfo.mac;
+        if (mac != null && !PLACEHOLDER_MAC.equalsIgnoreCase(mac)) {
+            putIfPresent(properties, Thing.PROPERTY_MAC_ADDRESS, mac);
+        }
+        return properties;
+    }
+
+    private static void putIfPresent(Map<String, String> properties, String key, @Nullable String value) {
+        if (value != null && !value.isBlank()) {
+            properties.put(key, value);
+        }
+    }
+
+    /**
+     * Sends a command to the Fully Kiosk REST interface and parses the JSON response.
+     *
+     * @param config the configuration to use for this request
+     * @param fullyCommand the value of the {@code cmd} query parameter
+     * @param parameters additional query parameters
+     * @param responseType the class to parse the JSON response into
+     */
+    private <T extends Response> T sendCommand(FullyKioskConfiguration config, String fullyCommand,
+            Map<String, String> parameters, Class<T> responseType)
             throws FullyKioskCommunicationException, InterruptedException {
+        // Jetty URL-encodes query parameters, so values such as the password may contain any characters.
+        Request request = httpClient.newRequest(config.hostname, config.port).path("/").param("cmd", fullyCommand)
+                .param("type", "json").param("password", config.password)
+                .timeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        parameters.forEach(request::param);
+
         ContentResponse response;
         try {
-            // Jetty URL-encodes query parameters, so the password may contain any characters.
-            response = httpClient.newRequest(config.hostname, config.port).path("/").param("cmd", "deviceInfo")
-                    .param("type", "json").param("password", config.password)
-                    .timeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS).send();
+            response = request.send();
         } catch (TimeoutException | ExecutionException e) {
-            logger.debug("Request to Fully Kiosk at {}:{} failed: {}", config.hostname, config.port, e.getMessage());
+            logger.debug("Request '{}' to Fully Kiosk at {}:{} failed: {}", fullyCommand, config.hostname, config.port,
+                    e.getMessage());
             throw new FullyKioskCommunicationException("@text/offline.communication-error.unreachable", e);
         }
 
@@ -170,28 +268,28 @@ public class FullyKioskHandler extends BaseThingHandler {
             throw new FullyKioskCommunicationException(
                     "@text/offline.communication-error.http-status [\"" + response.getStatus() + "\"]");
         }
-        return parseDeviceInfo(response.getContentAsString());
+        return parseResponse(response.getContentAsString(), responseType);
     }
 
     /**
-     * Parses a {@code deviceInfo} response and rejects error responses reported by the device.
+     * Parses a JSON response and rejects error responses reported by the device.
      */
-    static DeviceInfo parseDeviceInfo(String json) throws FullyKioskCommunicationException {
-        DeviceInfo deviceInfo;
+    static <T extends Response> T parseResponse(String json, Class<T> responseType)
+            throws FullyKioskCommunicationException {
+        @Nullable
+        T response;
         try {
-            deviceInfo = GSON.fromJson(json, DeviceInfo.class);
+            response = GSON.fromJson(json, responseType);
         } catch (JsonSyntaxException e) {
             throw new FullyKioskCommunicationException("@text/offline.communication-error.invalid-response", e);
         }
-        if (deviceInfo == null) {
+        if (response == null) {
             throw new FullyKioskCommunicationException("@text/offline.communication-error.invalid-response");
         }
-        if (DeviceInfo.STATUS_ERROR.equals(deviceInfo.status)) {
-            String statusText = deviceInfo.statustext;
-            String detail = statusText == null ? "" : statusText.replace('"', '\'');
-            throw new FullyKioskCommunicationException(
-                    "@text/offline.communication-error.device-error [\"" + detail + "\"]");
+        if (Response.STATUS_ERROR.equals(response.status)) {
+            String statusText = response.statustext;
+            throw new FullyKioskDeviceErrorException(statusText == null ? "" : statusText);
         }
-        return deviceInfo;
+        return response;
     }
 }

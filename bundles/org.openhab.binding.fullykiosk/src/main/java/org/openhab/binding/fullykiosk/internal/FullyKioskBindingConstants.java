@@ -30,6 +30,8 @@ public class FullyKioskBindingConstants {
     public static final ThingTypeUID THING_TYPE_DEVICE = new ThingTypeUID(BINDING_ID, "device");
 
     // List of all Channel ids
+    public static final String CHANNEL_SCREEN = "screen";
+    public static final String CHANNEL_SCREENSAVER = "screensaver";
     public static final String CHANNEL_BATTERY_LEVEL = "battery-level";
     public static final String CHANNEL_BATTERY_TEMPERATURE = "battery-temperature";
     public static final String CHANNEL_PLUGGED = "plugged";
@@ -42,4 +44,9 @@ public class FullyKioskBindingConstants {
     public static final String CHANNEL_STORAGE_TOTAL = "storage-total";
     public static final String CHANNEL_MEMORY_FREE = "memory-free";
     public static final String CHANNEL_MEMORY_TOTAL = "memory-total";
+
+    // List of all Thing property names not defined by openHAB core
+    public static final String PROPERTY_DEVICE_ID = "deviceId";
+    public static final String PROPERTY_DEVICE_NAME = "deviceName";
+    public static final String PROPERTY_APP_VERSION = "appVersion";
 }

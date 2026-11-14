@@ -13,30 +13,46 @@
 package org.openhab.binding.fullykiosk.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.openhab.binding.fullykiosk.internal.FullyKioskBindingConstants.*;
+
+import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.junit.jupiter.api.Test;
 import org.openhab.binding.fullykiosk.internal.dto.DeviceInfo;
+import org.openhab.binding.fullykiosk.internal.dto.Response;
+import org.openhab.core.thing.Thing;
 
 /**
- * Tests parsing of Fully Kiosk {@code deviceInfo} responses.
+ * Tests parsing of Fully Kiosk responses and derived Thing properties.
  *
  * @author Keith Knauss - Initial contribution
  */
 @NonNullByDefault
 public class FullyKioskHandlerTest {
 
+    private static DeviceInfo parseDeviceInfo(String json) throws FullyKioskCommunicationException {
+        return FullyKioskHandler.parseResponse(json, DeviceInfo.class);
+    }
+
     @Test
     public void parsesBatteryLevel() throws FullyKioskCommunicationException {
-        DeviceInfo deviceInfo = FullyKioskHandler
-                .parseDeviceInfo("{\"deviceName\":\"Garage\",\"batteryLevel\":65,\"plugged\":true}");
+        DeviceInfo deviceInfo = parseDeviceInfo("{\"deviceName\":\"Garage\",\"batteryLevel\":65,\"plugged\":true}");
 
         assertEquals(65.0, deviceInfo.batteryLevel);
     }
 
     @Test
+    public void parsesScreenState() throws FullyKioskCommunicationException {
+        DeviceInfo deviceInfo = parseDeviceInfo("{\"screenOn\":true,\"isInScreensaver\":false}");
+
+        assertEquals(Boolean.TRUE, deviceInfo.screenOn);
+        assertEquals(Boolean.FALSE, deviceInfo.isInScreensaver);
+    }
+
+    @Test
     public void parsesDiagnosticFields() throws FullyKioskCommunicationException {
-        DeviceInfo deviceInfo = FullyKioskHandler.parseDeviceInfo("""
+        DeviceInfo deviceInfo = parseDeviceInfo("""
                 {
                   "batteryTemperature": 23.5,
                   "plugged": false,
@@ -67,29 +83,66 @@ public class FullyKioskHandlerTest {
 
     @Test
     public void missingFieldsAreNull() throws FullyKioskCommunicationException {
-        DeviceInfo deviceInfo = FullyKioskHandler.parseDeviceInfo("{\"deviceName\":\"Garage\"}");
+        DeviceInfo deviceInfo = parseDeviceInfo("{\"deviceName\":\"Garage\"}");
 
         assertNull(deviceInfo.batteryLevel);
+        assertNull(deviceInfo.screenOn);
         assertNull(deviceInfo.plugged);
         assertNull(deviceInfo.currentPage);
         assertNull(deviceInfo.internalStorageFreeSpace);
     }
 
     @Test
-    public void errorResponseIsRejected() {
-        FullyKioskCommunicationException e = assertThrows(FullyKioskCommunicationException.class,
-                () -> FullyKioskHandler.parseDeviceInfo("{\"status\":\"Error\",\"statustext\":\"Wrong \\\"pw\\\"\"}"));
+    public void buildsProperties() throws FullyKioskCommunicationException {
+        DeviceInfo deviceInfo = parseDeviceInfo("""
+                {
+                  "deviceID": "abc123",
+                  "deviceName": "Garage Tablet",
+                  "deviceManufacturer": "samsung",
+                  "deviceModel": "SM-T290",
+                  "appVersionName": "1.57",
+                  "Mac": "a4:50:46:12:34:56"
+                }
+                """);
 
+        assertEquals(
+                Map.of(Thing.PROPERTY_VENDOR, "samsung", Thing.PROPERTY_MODEL_ID, "SM-T290", PROPERTY_DEVICE_ID,
+                        "abc123", PROPERTY_DEVICE_NAME, "Garage Tablet", PROPERTY_APP_VERSION, "1.57",
+                        Thing.PROPERTY_MAC_ADDRESS, "a4:50:46:12:34:56"),
+                FullyKioskHandler.buildProperties(deviceInfo));
+    }
+
+    @Test
+    public void omitsPlaceholderMacAndBlankProperties() throws FullyKioskCommunicationException {
+        DeviceInfo deviceInfo = parseDeviceInfo("{\"deviceModel\":\"\",\"Mac\":\"02:00:00:00:00:00\"}");
+
+        assertEquals(Map.of(), FullyKioskHandler.buildProperties(deviceInfo));
+    }
+
+    @Test
+    public void acceptsCommandResponse() throws FullyKioskCommunicationException {
+        Response response = FullyKioskHandler
+                .parseResponse("{\"status\":\"OK\",\"statustext\":\"Switching the screen on\"}", Response.class);
+
+        assertEquals("OK", response.status);
+    }
+
+    @Test
+    public void errorResponseIsRejected() {
+        FullyKioskDeviceErrorException e = assertThrows(FullyKioskDeviceErrorException.class,
+                () -> parseDeviceInfo("{\"status\":\"Error\",\"statustext\":\"Wrong \\\"pw\\\"\"}"));
+
+        assertEquals("Wrong \"pw\"", e.getDeviceMessage());
         assertEquals("@text/offline.communication-error.device-error [\"Wrong 'pw'\"]", e.getMessage());
     }
 
     @Test
     public void malformedResponseIsRejected() {
-        assertThrows(FullyKioskCommunicationException.class, () -> FullyKioskHandler.parseDeviceInfo("<html>"));
+        assertThrows(FullyKioskCommunicationException.class, () -> parseDeviceInfo("<html>"));
     }
 
     @Test
     public void emptyResponseIsRejected() {
-        assertThrows(FullyKioskCommunicationException.class, () -> FullyKioskHandler.parseDeviceInfo(""));
+        assertThrows(FullyKioskCommunicationException.class, () -> parseDeviceInfo(""));
     }
 }

@@ -28,10 +28,16 @@ Things must be added manually.
 | password        | text    | Password set in the Fully Kiosk Remote Administration settings | N/A     | yes      | no       |
 | refreshInterval | integer | Interval in seconds between polls of the device                | 30      | no       | yes      |
 
+## Thing Properties
+
+When the device is online, the Thing shows its vendor, model, MAC address, Fully Kiosk device ID, device name and Fully Kiosk version as properties.
+
 ## Channels
 
 | Channel             | Type               | Read/Write | Advanced | Description                                             |
 |---------------------|--------------------|------------|----------|---------------------------------------------------------|
+| screen              | Switch             | RW         | no       | Turns the screen on or off                              |
+| screensaver         | Switch             | RW         | no       | Starts or stops the Fully Kiosk screensaver             |
 | battery-level       | Number             | R          | no       | Battery charge level (0-100 %)                          |
 | battery-temperature | Number:Temperature | R          | no       | Temperature of the device battery                       |
 | plugged             | Switch             | R          | no       | Whether the device is connected to a power source       |
@@ -56,5 +62,6 @@ Thing fullykiosk:device:hallway "Hallway Tablet" [ hostname="192.168.1.50", pass
 ### Item Configuration
 
 ```java
+Switch HallwayTablet_Screen "Hallway Tablet Screen" { channel="fullykiosk:device:hallway:screen" }
 Number HallwayTablet_Battery "Hallway Tablet Battery [%d %%]" { channel="fullykiosk:device:hallway:battery-level" }
 ```

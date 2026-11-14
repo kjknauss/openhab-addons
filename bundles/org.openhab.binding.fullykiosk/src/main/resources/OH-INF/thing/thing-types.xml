@@ -10,6 +10,8 @@
 		<semantic-equipment-tag>Display</semantic-equipment-tag>
 
 		<channels>
+			<channel id="screen" typeId="screen"/>
+			<channel id="screensaver" typeId="screensaver"/>
 			<channel id="battery-level" typeId="system.battery-level"/>
 			<channel id="battery-temperature" typeId="battery-temperature"/>
 			<channel id="plugged" typeId="plugged"/>
@@ -49,6 +51,25 @@
 			</parameter>
 		</config-description>
 	</thing-type>
+
+	<channel-type id="screen">
+		<item-type>Switch</item-type>
+		<label>Screen</label>
+		<description>Turns the screen on or off</description>
+		<tags>
+			<tag>Switch</tag>
+			<tag>Power</tag>
+		</tags>
+	</channel-type>
+
+	<channel-type id="screensaver">
+		<item-type>Switch</item-type>
+		<label>Screensaver</label>
+		<description>Starts or stops the Fully Kiosk screensaver</description>
+		<tags>
+			<tag>Switch</tag>
+		</tags>
+	</channel-type>
 
 	<channel-type id="battery-temperature">
 		<item-type>Number:Temperature</item-type>
