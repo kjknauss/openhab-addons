@@ -75,7 +75,17 @@ public class FullyKioskHandler extends BaseThingHandler {
     private static final String PLACEHOLDER_MAC = "02:00:00:00:00:00";
 
     private static final String SETTING_SCREEN_BRIGHTNESS = "screenBrightness";
+    private static final String SETTING_SCREENSAVER_BRIGHTNESS = "screensaverBrightness";
+    private static final String SETTING_MOTION_DETECTION = "motionDetection";
+    private static final String SETTING_SCREENSAVER_TIMEOUT = "timeToScreensaverV2";
+    private static final String SETTING_SCREEN_OFF_TIMEOUT = "timeToScreenOffV2";
     private static final int MAX_BRIGHTNESS = 255;
+    private static final int MAX_TIMEOUT_SECONDS = 86400;
+
+    /** Channels whose state comes from the settings list rather than from deviceInfo. */
+    private static final Set<String> SETTINGS_CHANNELS = Set.of(CHANNEL_SCREEN_BRIGHTNESS,
+            CHANNEL_SCREENSAVER_BRIGHTNESS, CHANNEL_MOTION_DETECTION, CHANNEL_SCREENSAVER_TIMEOUT,
+            CHANNEL_SCREEN_OFF_TIMEOUT);
 
     /** Commands without parameters that may be sent through the action channel. */
     private static final Set<String> ACTIONS = Set.of("loadStartUrl", "toForeground", "toBackground", "restartApp",
@@ -88,7 +98,7 @@ public class FullyKioskHandler extends BaseThingHandler {
     private volatile @Nullable DeviceInfo lastDeviceInfo;
     private @Nullable ScheduledFuture<?> pollingJob;
     private volatile Map<String, String> lastProperties = Map.of();
-    private volatile State lastBrightness = UnDefType.UNDEF;
+    private volatile @Nullable JsonObject lastSettings;
     /** Cleared on dispose so that polls and commands still in flight do not publish stale state. */
     private volatile boolean active;
 
@@ -125,14 +135,14 @@ public class FullyKioskHandler extends BaseThingHandler {
             pollingJob = null;
         }
         lastDeviceInfo = null;
-        lastBrightness = UnDefType.UNDEF;
+        lastSettings = null;
     }
 
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
         if (command instanceof RefreshType) {
-            if (CHANNEL_SCREEN_BRIGHTNESS.equals(channelUID.getId())) {
-                updateState(CHANNEL_SCREEN_BRIGHTNESS, lastBrightness);
+            if (SETTINGS_CHANNELS.contains(channelUID.getId())) {
+                updateSettingsChannels(lastSettings);
                 return;
             }
             DeviceInfo deviceInfo = lastDeviceInfo;
@@ -169,16 +179,32 @@ public class FullyKioskHandler extends BaseThingHandler {
                 }
             }
             case CHANNEL_SCREEN_BRIGHTNESS -> {
-                Integer brightness = null;
-                if (command instanceof PercentType percent) {
-                    brightness = toFullyBrightness(percent);
-                } else if (command instanceof OnOffType onOff) {
-                    brightness = onOff == OnOffType.ON ? MAX_BRIGHTNESS : 0;
+                return toBrightnessCommand(SETTING_SCREEN_BRIGHTNESS, command);
+            }
+            case CHANNEL_SCREENSAVER_BRIGHTNESS -> {
+                return toBrightnessCommand(SETTING_SCREENSAVER_BRIGHTNESS, command);
+            }
+            case CHANNEL_KIOSK_LOCKED -> {
+                if (command instanceof OnOffType onOff) {
+                    return new FullyCommand(onOff == OnOffType.ON ? "lockKiosk" : "unlockKiosk");
                 }
-                if (brightness != null) {
-                    return new FullyCommand("setStringSetting",
-                            Map.of("key", SETTING_SCREEN_BRIGHTNESS, "value", String.valueOf(brightness)));
+            }
+            case CHANNEL_MAINTENANCE_MODE -> {
+                if (command instanceof OnOffType onOff) {
+                    return new FullyCommand(onOff == OnOffType.ON ? "enableLockedMode" : "disableLockedMode");
                 }
+            }
+            case CHANNEL_MOTION_DETECTION -> {
+                if (command instanceof OnOffType onOff) {
+                    return new FullyCommand("setBooleanSetting",
+                            Map.of("key", SETTING_MOTION_DETECTION, "value", String.valueOf(onOff == OnOffType.ON)));
+                }
+            }
+            case CHANNEL_SCREENSAVER_TIMEOUT -> {
+                return toTimeoutCommand(SETTING_SCREENSAVER_TIMEOUT, command);
+            }
+            case CHANNEL_SCREEN_OFF_TIMEOUT -> {
+                return toTimeoutCommand(SETTING_SCREEN_OFF_TIMEOUT, command);
             }
             case CHANNEL_URL -> {
                 if (command instanceof StringType url && !url.toString().isBlank()) {
@@ -195,6 +221,47 @@ public class FullyKioskHandler extends BaseThingHandler {
             }
         }
         return null;
+    }
+
+    private static @Nullable FullyCommand toBrightnessCommand(String settingKey, Command command) {
+        Integer brightness = null;
+        if (command instanceof PercentType percent) {
+            brightness = toFullyBrightness(percent);
+        } else if (command instanceof OnOffType onOff) {
+            brightness = onOff == OnOffType.ON ? MAX_BRIGHTNESS : 0;
+        }
+        return brightness == null ? null : setStringSetting(settingKey, brightness);
+    }
+
+    private static @Nullable FullyCommand toTimeoutCommand(String settingKey, Command command) {
+        Integer seconds = toTimeoutSeconds(command);
+        return seconds == null ? null : setStringSetting(settingKey, seconds);
+    }
+
+    private static FullyCommand setStringSetting(String key, int value) {
+        return new FullyCommand("setStringSetting", Map.of("key", key, "value", String.valueOf(value)));
+    }
+
+    /**
+     * Converts a timeout command into whole seconds. Plain numbers are taken as seconds.
+     *
+     * @return the timeout in seconds, or {@code null} if the command is not a valid timeout
+     */
+    static @Nullable Integer toTimeoutSeconds(Command command) {
+        double seconds;
+        if (command instanceof QuantityType<?> quantity) {
+            QuantityType<?> inSeconds = quantity.toUnit(Units.SECOND);
+            if (inSeconds == null) {
+                return null;
+            }
+            seconds = inSeconds.doubleValue();
+        } else if (command instanceof DecimalType decimal) {
+            seconds = decimal.doubleValue();
+        } else {
+            return null;
+        }
+        long rounded = Math.round(seconds);
+        return rounded < 0 || rounded > MAX_TIMEOUT_SECONDS ? null : (int) rounded;
     }
 
     /**
@@ -249,9 +316,9 @@ public class FullyKioskHandler extends BaseThingHandler {
                 lastProperties = properties;
             }
 
-            // Brightness is only available from the much larger settings list, so fetch it only when needed.
-            if (isLinked(CHANNEL_SCREEN_BRIGHTNESS)) {
-                updateBrightness(config);
+            // The settings list is much larger than deviceInfo, so fetch it only when a channel needs it.
+            if (SETTINGS_CHANNELS.stream().anyMatch(this::isLinked)) {
+                updateSettings(config);
             }
         } catch (FullyKioskCommunicationException e) {
             updateStatus(ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
@@ -260,20 +327,33 @@ public class FullyKioskHandler extends BaseThingHandler {
         }
     }
 
-    private void updateBrightness(FullyKioskConfiguration config)
+    private void updateSettings(FullyKioskConfiguration config)
             throws FullyKioskCommunicationException, InterruptedException {
-        State brightness = UnDefType.UNDEF;
+        @Nullable
+        JsonObject settings = null;
         try {
-            JsonObject settings = parseSettings(sendRequest(config, "listSettings", Map.of()));
-            Double value = getNumberSetting(settings, SETTING_SCREEN_BRIGHTNESS);
-            if (value != null) {
-                brightness = toBrightnessPercent(value);
-            }
+            settings = parseSettings(sendRequest(config, "listSettings", Map.of()));
         } catch (FullyKioskDeviceErrorException e) {
             logger.debug("Fully Kiosk rejected reading settings: {}", e.getDeviceMessage());
         }
-        lastBrightness = brightness;
-        updateState(CHANNEL_SCREEN_BRIGHTNESS, brightness);
+        lastSettings = settings;
+        updateSettingsChannels(settings);
+    }
+
+    private void updateSettingsChannels(@Nullable JsonObject settings) {
+        updateState(CHANNEL_SCREEN_BRIGHTNESS,
+                toBrightnessState(getNumberSetting(settings, SETTING_SCREEN_BRIGHTNESS)));
+        updateState(CHANNEL_SCREENSAVER_BRIGHTNESS,
+                toBrightnessState(getNumberSetting(settings, SETTING_SCREENSAVER_BRIGHTNESS)));
+        updateState(CHANNEL_MOTION_DETECTION, toOnOff(getBooleanSetting(settings, SETTING_MOTION_DETECTION)));
+        updateState(CHANNEL_SCREENSAVER_TIMEOUT,
+                toQuantity(getNumberSetting(settings, SETTING_SCREENSAVER_TIMEOUT), Units.SECOND));
+        updateState(CHANNEL_SCREEN_OFF_TIMEOUT,
+                toQuantity(getNumberSetting(settings, SETTING_SCREEN_OFF_TIMEOUT), Units.SECOND));
+    }
+
+    private static State toBrightnessState(@Nullable Double brightness) {
+        return brightness == null ? UnDefType.UNDEF : toBrightnessPercent(brightness);
     }
 
     private void updateChannels(DeviceInfo deviceInfo) {
@@ -286,6 +366,8 @@ public class FullyKioskHandler extends BaseThingHandler {
         updateState(CHANNEL_FOREGROUND_APP, toString(deviceInfo.foregroundApp));
         updateState(CHANNEL_SCREEN_ORIENTATION, toDecimal(deviceInfo.screenOrientation));
         updateState(CHANNEL_KIOSK_MODE, toOnOff(deviceInfo.kioskMode));
+        updateState(CHANNEL_KIOSK_LOCKED, toOnOff(deviceInfo.kioskLocked));
+        updateState(CHANNEL_MAINTENANCE_MODE, toOnOff(deviceInfo.maintenanceMode));
         updateState(CHANNEL_DEVICE_ADMIN, toOnOff(deviceInfo.isDeviceAdmin));
         updateState(CHANNEL_STORAGE_FREE, toQuantity(deviceInfo.internalStorageFreeSpace, Units.BYTE));
         updateState(CHANNEL_STORAGE_TOTAL, toQuantity(deviceInfo.internalStorageTotalSpace, Units.BYTE));
@@ -389,7 +471,10 @@ public class FullyKioskHandler extends BaseThingHandler {
      *
      * @return the value, or {@code null} if the setting is missing, empty or not numeric
      */
-    static @Nullable Double getNumberSetting(JsonObject settings, String key) {
+    static @Nullable Double getNumberSetting(@Nullable JsonObject settings, String key) {
+        if (settings == null) {
+            return null;
+        }
         JsonElement element = settings.get(key);
         if (element == null || !element.isJsonPrimitive()) {
             return null;
@@ -403,6 +488,35 @@ public class FullyKioskHandler extends BaseThingHandler {
                 return Double.valueOf(primitive.getAsString().trim());
             } catch (NumberFormatException e) {
                 return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Reads a boolean setting. Both JSON booleans and the strings {@code "true"} and {@code "false"} are accepted.
+     *
+     * @return the value, or {@code null} if the setting is missing or not a boolean
+     */
+    static @Nullable Boolean getBooleanSetting(@Nullable JsonObject settings, String key) {
+        if (settings == null) {
+            return null;
+        }
+        JsonElement element = settings.get(key);
+        if (element == null || !element.isJsonPrimitive()) {
+            return null;
+        }
+        JsonPrimitive primitive = element.getAsJsonPrimitive();
+        if (primitive.isBoolean()) {
+            return primitive.getAsBoolean();
+        }
+        if (primitive.isString()) {
+            String value = primitive.getAsString().trim();
+            if ("true".equalsIgnoreCase(value)) {
+                return Boolean.TRUE;
+            }
+            if ("false".equalsIgnoreCase(value)) {
+                return Boolean.FALSE;
             }
         }
         return null;

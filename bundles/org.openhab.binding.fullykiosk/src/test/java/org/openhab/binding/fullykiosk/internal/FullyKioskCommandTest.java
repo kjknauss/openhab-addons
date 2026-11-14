@@ -22,7 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
+import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.library.types.StringType;
+import org.openhab.core.library.unit.Units;
 
 import com.google.gson.JsonObject;
 
@@ -94,6 +96,65 @@ public class FullyKioskCommandTest {
         assertNull(FullyKioskHandler.getNumberSetting(settings, "empty"));
         assertNull(FullyKioskHandler.getNumberSetting(settings, "flag"));
         assertNull(FullyKioskHandler.getNumberSetting(settings, "missing"));
+    }
+
+    @Test
+    public void mapsKioskLockAndMaintenanceMode() {
+        assertEquals(new FullyCommand("lockKiosk"),
+                FullyKioskHandler.toFullyCommand(CHANNEL_KIOSK_LOCKED, OnOffType.ON));
+        assertEquals(new FullyCommand("unlockKiosk"),
+                FullyKioskHandler.toFullyCommand(CHANNEL_KIOSK_LOCKED, OnOffType.OFF));
+        assertEquals(new FullyCommand("enableLockedMode"),
+                FullyKioskHandler.toFullyCommand(CHANNEL_MAINTENANCE_MODE, OnOffType.ON));
+        assertEquals(new FullyCommand("disableLockedMode"),
+                FullyKioskHandler.toFullyCommand(CHANNEL_MAINTENANCE_MODE, OnOffType.OFF));
+    }
+
+    @Test
+    public void mapsMotionDetection() {
+        assertEquals(new FullyCommand("setBooleanSetting", Map.of("key", "motionDetection", "value", "true")),
+                FullyKioskHandler.toFullyCommand(CHANNEL_MOTION_DETECTION, OnOffType.ON));
+        assertEquals(new FullyCommand("setBooleanSetting", Map.of("key", "motionDetection", "value", "false")),
+                FullyKioskHandler.toFullyCommand(CHANNEL_MOTION_DETECTION, OnOffType.OFF));
+    }
+
+    @Test
+    public void mapsScreensaverBrightness() {
+        assertEquals(new FullyCommand("setStringSetting", Map.of("key", "screensaverBrightness", "value", "26")),
+                FullyKioskHandler.toFullyCommand(CHANNEL_SCREENSAVER_BRIGHTNESS, new PercentType(10)));
+    }
+
+    @Test
+    public void mapsTimeouts() {
+        assertEquals(new FullyCommand("setStringSetting", Map.of("key", "timeToScreensaverV2", "value", "300")),
+                FullyKioskHandler.toFullyCommand(CHANNEL_SCREENSAVER_TIMEOUT, new QuantityType<>(5, Units.MINUTE)));
+        assertEquals(new FullyCommand("setStringSetting", Map.of("key", "timeToScreenOffV2", "value", "45")),
+                FullyKioskHandler.toFullyCommand(CHANNEL_SCREEN_OFF_TIMEOUT, new DecimalType(45)));
+    }
+
+    @Test
+    public void convertsTimeouts() {
+        assertEquals(90, FullyKioskHandler.toTimeoutSeconds(new QuantityType<>(1.5, Units.MINUTE)));
+        assertEquals(0, FullyKioskHandler.toTimeoutSeconds(DecimalType.ZERO));
+        assertEquals(86400, FullyKioskHandler.toTimeoutSeconds(new QuantityType<>(24, Units.HOUR)));
+        assertNull(FullyKioskHandler.toTimeoutSeconds(new QuantityType<>(25, Units.HOUR)));
+        assertNull(FullyKioskHandler.toTimeoutSeconds(new DecimalType(-1)));
+        assertNull(FullyKioskHandler.toTimeoutSeconds(new QuantityType<>(5, Units.PERCENT)));
+        assertNull(FullyKioskHandler.toTimeoutSeconds(OnOffType.ON));
+    }
+
+    @Test
+    public void readsBooleanSettings() throws FullyKioskCommunicationException {
+        JsonObject settings = FullyKioskHandler
+                .parseSettings("{\"a\":true,\"b\":\"false\",\"c\":\"TRUE\",\"d\":\"yes\",\"e\":1}");
+
+        assertEquals(Boolean.TRUE, FullyKioskHandler.getBooleanSetting(settings, "a"));
+        assertEquals(Boolean.FALSE, FullyKioskHandler.getBooleanSetting(settings, "b"));
+        assertEquals(Boolean.TRUE, FullyKioskHandler.getBooleanSetting(settings, "c"));
+        assertNull(FullyKioskHandler.getBooleanSetting(settings, "d"));
+        assertNull(FullyKioskHandler.getBooleanSetting(settings, "e"));
+        assertNull(FullyKioskHandler.getBooleanSetting(settings, "missing"));
+        assertNull(FullyKioskHandler.getBooleanSetting(null, "a"));
     }
 
     @Test

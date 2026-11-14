@@ -35,6 +35,12 @@ public class FullyKioskBindingConstants {
     public static final String CHANNEL_SCREEN_BRIGHTNESS = "screen-brightness";
     public static final String CHANNEL_URL = "url";
     public static final String CHANNEL_ACTION = "action";
+    public static final String CHANNEL_KIOSK_LOCKED = "kiosk-locked";
+    public static final String CHANNEL_MAINTENANCE_MODE = "maintenance-mode";
+    public static final String CHANNEL_MOTION_DETECTION = "motion-detection";
+    public static final String CHANNEL_SCREENSAVER_BRIGHTNESS = "screensaver-brightness";
+    public static final String CHANNEL_SCREENSAVER_TIMEOUT = "screensaver-timeout";
+    public static final String CHANNEL_SCREEN_OFF_TIMEOUT = "screen-off-timeout";
     public static final String CHANNEL_BATTERY_LEVEL = "battery-level";
     public static final String CHANNEL_BATTERY_TEMPERATURE = "battery-temperature";
     public static final String CHANNEL_PLUGGED = "plugged";

@@ -21,6 +21,12 @@
 			<channel id="foreground-app" typeId="foreground-app"/>
 			<channel id="screen-orientation" typeId="screen-orientation"/>
 			<channel id="kiosk-mode" typeId="kiosk-mode"/>
+			<channel id="kiosk-locked" typeId="kiosk-locked"/>
+			<channel id="maintenance-mode" typeId="maintenance-mode"/>
+			<channel id="motion-detection" typeId="motion-detection"/>
+			<channel id="screensaver-brightness" typeId="screensaver-brightness"/>
+			<channel id="screensaver-timeout" typeId="screensaver-timeout"/>
+			<channel id="screen-off-timeout" typeId="screen-off-timeout"/>
 			<channel id="device-admin" typeId="device-admin"/>
 			<channel id="storage-free" typeId="storage-free"/>
 			<channel id="storage-total" typeId="storage-total"/>
@@ -152,6 +158,57 @@
 			<tag>Status</tag>
 		</tags>
 		<state readOnly="true"/>
+	</channel-type>
+
+	<channel-type id="kiosk-locked" advanced="true">
+		<item-type>Switch</item-type>
+		<label>Kiosk Locked</label>
+		<description>Locks or unlocks kiosk mode</description>
+		<tags>
+			<tag>Switch</tag>
+		</tags>
+	</channel-type>
+
+	<channel-type id="maintenance-mode" advanced="true">
+		<item-type>Switch</item-type>
+		<label>Maintenance Mode</label>
+		<description>Enables or disables the Fully Kiosk maintenance mode</description>
+		<tags>
+			<tag>Switch</tag>
+		</tags>
+	</channel-type>
+
+	<channel-type id="motion-detection" advanced="true">
+		<item-type>Switch</item-type>
+		<label>Motion Detection</label>
+		<description>Enables or disables camera motion detection</description>
+		<tags>
+			<tag>Switch</tag>
+		</tags>
+	</channel-type>
+
+	<channel-type id="screensaver-brightness" advanced="true">
+		<item-type>Dimmer</item-type>
+		<label>Screensaver Brightness</label>
+		<description>Brightness of the screen while the screensaver is running</description>
+		<tags>
+			<tag>Control</tag>
+			<tag>Brightness</tag>
+		</tags>
+	</channel-type>
+
+	<channel-type id="screensaver-timeout" advanced="true">
+		<item-type unitHint="s">Number:Time</item-type>
+		<label>Screensaver Timeout</label>
+		<description>Inactivity time before the screensaver starts, 0 to disable</description>
+		<state min="0" max="86400" step="1" pattern="%d %unit%"/>
+	</channel-type>
+
+	<channel-type id="screen-off-timeout" advanced="true">
+		<item-type unitHint="s">Number:Time</item-type>
+		<label>Screen Off Timeout</label>
+		<description>Inactivity time before the screen turns off, 0 to disable</description>
+		<state min="0" max="86400" step="1" pattern="%d %unit%"/>
 	</channel-type>
 
 	<channel-type id="device-admin" advanced="true">

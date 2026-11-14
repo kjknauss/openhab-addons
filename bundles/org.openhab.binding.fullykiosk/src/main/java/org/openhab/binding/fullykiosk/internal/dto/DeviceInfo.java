@@ -43,6 +43,8 @@ public class DeviceInfo extends Response {
     public @Nullable String foregroundApp;
     public @Nullable Double screenOrientation;
     public @Nullable Boolean kioskMode;
+    public @Nullable Boolean kioskLocked;
+    public @Nullable Boolean maintenanceMode;
     public @Nullable Boolean isDeviceAdmin;
 
     // Numeric fields use Double so that an unexpected decimal value cannot fail parsing of the whole response.
