@@ -34,30 +34,30 @@ When the device is online, the Thing shows its vendor, model, MAC address, Fully
 
 ## Channels
 
-| Channel                | Type               | Read/Write | Advanced | Description                                             |
-|------------------------|--------------------|------------|----------|---------------------------------------------------------|
-| screen                 | Switch             | RW         | no       | Turns the screen on or off                              |
-| screensaver            | Switch             | RW         | no       | Starts or stops the Fully Kiosk screensaver             |
-| screen-brightness      | Dimmer             | RW         | no       | Brightness of the screen                                |
-| url                    | String             | RW         | no       | Currently displayed page; send a URL to load it         |
-| action                 | String             | W          | no       | Triggers a one-time action, see below                   |
-| battery-level          | Number             | R          | no       | Battery charge level (0-100 %)                          |
-| battery-temperature    | Number:Temperature | R          | no       | Temperature of the device battery                       |
-| plugged                | Switch             | R          | no       | Whether the device is connected to a power source       |
-| foreground-app         | String             | R          | yes      | Package name of the app currently in the foreground     |
-| screen-orientation     | Number             | R          | yes      | Current screen orientation as reported by the device    |
-| kiosk-mode             | Switch             | R          | yes      | Whether kiosk mode is active                            |
-| kiosk-locked           | Switch             | RW         | yes      | Locks or unlocks kiosk mode                             |
-| maintenance-mode       | Switch             | RW         | yes      | Enables or disables the Fully Kiosk maintenance mode    |
-| motion-detection       | Switch             | RW         | yes      | Enables or disables camera motion detection             |
-| screensaver-brightness | Dimmer             | RW         | yes      | Screen brightness while the screensaver is running      |
-| screensaver-timeout    | Number:Time        | RW         | yes      | Inactivity time before the screensaver starts, 0 = off  |
-| screen-off-timeout     | Number:Time        | RW         | yes      | Inactivity time before the screen turns off, 0 = off    |
-| device-admin           | Switch             | R          | yes      | Whether Fully Kiosk has device administrator permission |
-| storage-free           | Number:DataAmount  | R          | yes      | Free internal storage                                   |
-| storage-total          | Number:DataAmount  | R          | yes      | Total internal storage                                  |
-| memory-free            | Number:DataAmount  | R          | yes      | Free RAM                                                |
-| memory-total           | Number:DataAmount  | R          | yes      | Total RAM                                               |
+| Channel                | Type                 | Read/Write | Advanced | Description                                             |
+|------------------------|----------------------|------------|----------|---------------------------------------------------------|
+| screen                 | Switch               | RW         | no       | Turns the screen on or off                              |
+| screensaver            | Switch               | RW         | no       | Starts or stops the Fully Kiosk screensaver             |
+| screen-brightness      | Dimmer               | RW         | no       | Brightness of the screen                                |
+| url                    | String               | RW         | no       | Currently displayed page; send a URL to load it         |
+| action                 | String               | W          | no       | Triggers a one-time action, see below                   |
+| battery-level          | Number:Dimensionless | R          | no       | Battery charge level                                    |
+| battery-temperature    | Number:Temperature   | R          | no       | Temperature of the device battery                       |
+| plugged                | Switch               | R          | no       | Whether the device is connected to a power source       |
+| foreground-app         | String               | R          | yes      | Package name of the app currently in the foreground     |
+| screen-orientation     | Number               | R          | yes      | Current screen orientation as reported by the device    |
+| kiosk-mode             | Switch               | R          | yes      | Whether kiosk mode is active                            |
+| kiosk-locked           | Switch               | RW         | yes      | Locks or unlocks kiosk mode                             |
+| maintenance-mode       | Switch               | RW         | yes      | Enables or disables the Fully Kiosk maintenance mode    |
+| motion-detection       | Switch               | RW         | yes      | Enables or disables camera motion detection             |
+| screensaver-brightness | Dimmer               | RW         | yes      | Screen brightness while the screensaver is running      |
+| screensaver-timeout    | Number:Time          | RW         | yes      | Inactivity time before the screensaver starts, 0 = off  |
+| screen-off-timeout     | Number:Time          | RW         | yes      | Inactivity time before the screen turns off, 0 = off    |
+| device-admin           | Switch               | R          | yes      | Whether Fully Kiosk has device administrator permission |
+| storage-free           | Number:DataAmount    | R          | yes      | Free internal storage                                   |
+| storage-total          | Number:DataAmount    | R          | yes      | Total internal storage                                  |
+| memory-free            | Number:DataAmount    | R          | yes      | Free RAM                                                |
+| memory-total           | Number:DataAmount    | R          | yes      | Total RAM                                               |
 
 The `screen-brightness`, `screensaver-brightness`, `motion-detection`, `screensaver-timeout` and `screen-off-timeout` channels read the Fully Kiosk settings.
 The settings are only requested while at least one of these channels is linked.
@@ -87,5 +87,5 @@ Thing fullykiosk:device:hallway "Hallway Tablet" [ hostname="192.168.1.50", pass
 Switch HallwayTablet_Screen "Hallway Tablet Screen" { channel="fullykiosk:device:hallway:screen" }
 Dimmer HallwayTablet_Brightness "Hallway Tablet Brightness [%d %%]" { channel="fullykiosk:device:hallway:screen-brightness" }
 String HallwayTablet_Url "Hallway Tablet Page [%s]" { channel="fullykiosk:device:hallway:url" }
-Number HallwayTablet_Battery "Hallway Tablet Battery [%d %%]" { channel="fullykiosk:device:hallway:battery-level" }
+Number:Dimensionless HallwayTablet_Battery "Hallway Tablet Battery [%d %%]" { channel="fullykiosk:device:hallway:battery-level" }
 ```

@@ -359,7 +359,7 @@ public class FullyKioskHandler extends BaseThingHandler {
     private void updateChannels(DeviceInfo deviceInfo) {
         updateState(CHANNEL_SCREEN, toOnOff(deviceInfo.screenOn));
         updateState(CHANNEL_SCREENSAVER, toOnOff(deviceInfo.isInScreensaver));
-        updateState(CHANNEL_BATTERY_LEVEL, toDecimal(deviceInfo.batteryLevel));
+        updateState(CHANNEL_BATTERY_LEVEL, toQuantity(deviceInfo.batteryLevel, Units.PERCENT));
         updateState(CHANNEL_BATTERY_TEMPERATURE, toQuantity(deviceInfo.batteryTemperature, SIUnits.CELSIUS));
         updateState(CHANNEL_PLUGGED, toOnOff(deviceInfo.plugged));
         updateState(CHANNEL_URL, toString(deviceInfo.currentPage));
